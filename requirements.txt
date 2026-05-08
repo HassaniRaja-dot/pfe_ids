@@ -1,8 +1,0 @@
-gradio>=4.0.0
-torch
-torch-geometric
-scikit-learn
-pandas
-numpy
-scipy
-requests
