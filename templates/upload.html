@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Analyse CSV · GAT-IDS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#020408;--surface:#080e14;--surface2:#0c1620;
+  --border:#0f2030;--border2:#1a3a50;
+  --accent:#00d4ff;--danger:#ff3b4e;--safe:#00e676;--warn:#ffb300;
+  --muted:#4a6b80;--text:#d0e8f0;--dim:#7a99aa;
+  --mono:'JetBrains Mono',monospace;--sans:'Syne',sans-serif;
+}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:var(--mono);min-height:100vh;overflow-x:hidden}
+body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(0,212,255,.025)1px,transparent 1px),linear-gradient(90deg,rgba(0,212,255,.025)1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0}
+
+nav{position:fixed;top:0;left:0;right:0;z-index:100;background:rgba(2,4,8,.92);border-bottom:1px solid var(--border2);backdrop-filter:blur(12px);display:flex;align-items:center;justify-content:space-between;padding:0 2rem;height:58px}
+.nav-brand{display:flex;align-items:center;gap:.75rem;font-family:var(--sans);font-weight:700;font-size:1.1rem;color:var(--accent);letter-spacing:.05em;text-decoration:none}
+.nav-brand .dot{width:8px;height:8px;border-radius:50%;background:var(--accent);box-shadow:0 0 8px var(--accent);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.8)}}
+.nav-links{display:flex;gap:.5rem}
+.nav-link{padding:.45rem 1rem;font-size:.8rem;font-family:var(--mono);letter-spacing:.08em;color:var(--dim);text-decoration:none;border:1px solid transparent;border-radius:4px;transition:all .2s;text-transform:uppercase}
+.nav-link:hover,.nav-link.active{color:var(--accent);border-color:var(--border2);background:rgba(0,212,255,.05)}
+
+/* ── PAGE ── */
+.page{position:relative;z-index:1;padding:5rem 2rem 4rem;max-width:1200px;margin:0 auto}
+.page-header{margin-bottom:2.5rem}
+.page-tag{font-size:.7rem;letter-spacing:.2em;text-transform:uppercase;color:var(--accent);margin-bottom:.75rem}
+.page-title{font-family:var(--sans);font-size:2rem;font-weight:800;color:var(--text)}
+
+/* ── DROP ZONE ── */
+.dropzone{
+  background:var(--surface);border:2px dashed var(--border2);border-radius:8px;
+  padding:3.5rem 2rem;text-align:center;cursor:pointer;transition:all .25s;
+  position:relative;overflow:hidden;margin-bottom:2rem;
+}
+.dropzone:hover,.dropzone.drag{border-color:var(--accent);background:rgba(0,212,255,.04)}
+.dropzone.drag::before{content:'';position:absolute;inset:0;background:rgba(0,212,255,.06);animation:flash .4s ease}
+@keyframes flash{0%{opacity:0}100%{opacity:1}}
+#file-input{display:none}
+.drop-title{font-family:var(--sans);font-size:1.2rem;font-weight:700;color:var(--text);margin-bottom:.5rem}
+.drop-sub{font-size:.8rem;color:var(--dim);margin-bottom:1.5rem}
+.btn{display:inline-flex;align-items:center;gap:.6rem;padding:.65rem 1.75rem;font-family:var(--mono);font-size:.82rem;letter-spacing:.06em;text-transform:uppercase;border-radius:4px;transition:all .2s;cursor:pointer;border:none;text-decoration:none}
+.btn-primary{background:var(--accent);color:#000;font-weight:700;box-shadow:0 0 20px rgba(0,212,255,.25)}
+.btn-primary:hover{background:#fff;box-shadow:0 0 30px rgba(0,212,255,.5);transform:translateY(-2px)}
+.btn-outline{background:transparent;color:var(--accent);border:1px solid var(--border2)}
+.btn-outline:hover{background:rgba(0,212,255,.08);border-color:var(--accent)}
+.btn:disabled{opacity:.4;cursor:not-allowed;transform:none}
+
+/* ── FILE INFO ── */
+.file-info{display:none;align-items:center;justify-content:space-between;background:var(--surface2);border:1px solid var(--border2);border-radius:6px;padding:1rem 1.5rem;margin-bottom:1.5rem;flex-wrap:wrap;gap:.75rem}
+.file-info.show{display:flex}
+.file-name{font-weight:500;color:var(--accent);font-size:.9rem}
+.file-meta{font-size:.75rem;color:var(--dim)}
+.btn-analyze{margin-left:auto}
+
+/* ── PROGRESS ── */
+.progress-box{display:none;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:1.5rem;margin-bottom:2rem}
+.progress-box.show{display:block}
+.progress-label{font-size:.8rem;color:var(--dim);margin-bottom:.75rem;display:flex;justify-content:space-between}
+.progress-bar-wrap{height:4px;background:var(--border);border-radius:2px;overflow:hidden}
+.progress-bar{height:100%;background:var(--accent);width:0%;border-radius:2px;transition:width .4s;box-shadow:0 0 8px var(--accent)}
+.progress-log{margin-top:1rem;font-size:.75rem;color:var(--muted);font-family:var(--mono)}
+
+/* ── RESULTS ── */
+#results{display:none}
+#results.show{display:block}
+
+/* ── STATS GRID ── */
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1rem;margin-bottom:2rem}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:1.25rem 1.5rem}
+.stat-card.alert{border-color:#ff3b4e44;background:rgba(255,59,78,.04)}
+.stat-card.safe{border-color:#00e67644;background:rgba(0,230,118,.04)}
+.stat-label{font-size:.7rem;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin-bottom:.5rem}
+.stat-val{font-family:var(--sans);font-size:1.8rem;font-weight:800;color:var(--text)}
+.stat-val.danger{color:var(--danger)}
+.stat-val.safe{color:var(--safe)}
+.stat-val.warn{color:var(--warn)}
+
+/* ── CHARTS ROW ── */
+.charts-row{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-bottom:2rem}
+@media(max-width:700px){.charts-row{grid-template-columns:1fr}}
+.chart-box{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:1.5rem}
+.chart-title{font-size:.75rem;text-transform:uppercase;letter-spacing:.12em;color:var(--dim);margin-bottom:1rem}
+
+/* ── DONUT ── */
+.donut-wrap{display:flex;align-items:center;gap:1.5rem;flex-wrap:wrap}
+.donut{position:relative;width:120px;height:120px;flex-shrink:0}
+.donut svg{width:100%;height:100%;transform:rotate(-90deg)}
+.donut-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:var(--sans)}
+.donut-pct{font-size:1.3rem;font-weight:800;color:var(--danger)}
+.donut-sub{font-size:.6rem;color:var(--dim);text-transform:uppercase}
+.donut-legend{flex:1;display:flex;flex-direction:column;gap:.5rem}
+.legend-item{display:flex;align-items:center;gap:.6rem;font-size:.78rem}
+.legend-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+
+/* ── ATTACK BAR CHART ── */
+.bar-list{display:flex;flex-direction:column;gap:.65rem}
+.bar-item-row{display:grid;grid-template-columns:90px 1fr 52px;align-items:center;gap:.75rem;font-size:.75rem}
+.bar-label{color:var(--dim);text-overflow:ellipsis;overflow:hidden;white-space:nowrap}
+.bar-track{height:6px;background:var(--border);border-radius:3px;overflow:hidden}
+.bar-fill{height:100%;border-radius:3px;transition:width .6s cubic-bezier(.4,0,.2,1)}
+.bar-count{color:var(--dim);text-align:right}
+
+/* ── TABLE ── */
+.table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:6px;overflow:hidden;margin-bottom:2rem}
+.table-header{padding:1rem 1.5rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.75rem}
+.table-title{font-size:.78rem;text-transform:uppercase;letter-spacing:.12em;color:var(--dim)}
+.table-search{background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:.4rem .85rem;color:var(--text);font-family:var(--mono);font-size:.8rem;outline:none;width:200px}
+.table-search:focus{border-color:var(--border2)}
+.table-scroll{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:.78rem}
+thead tr{background:var(--surface2);border-bottom:1px solid var(--border2)}
+th{padding:.75rem 1rem;text-align:left;font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:400;white-space:nowrap}
+tbody tr{border-bottom:1px solid var(--border);transition:background .15s}
+tbody tr:hover{background:rgba(0,212,255,.03)}
+tbody tr:last-child{border-bottom:none}
+td{padding:.7rem 1rem;vertical-align:middle}
+
+.badge{display:inline-flex;align-items:center;gap:.4rem;padding:.25rem .65rem;border-radius:3px;font-size:.7rem;font-weight:500;letter-spacing:.06em;text-transform:uppercase}
+.badge-attack{background:rgba(255,59,78,.15);color:var(--danger)}
+.badge-normal{background:rgba(0,230,118,.12);color:var(--safe)}
+.badge-type{background:rgba(0,212,255,.1);color:var(--accent)}
+
+.conf-bar{height:3px;border-radius:2px;margin-top:4px;min-width:40px;max-width:80px}
+
+/* ── EMPTY / ERROR ── */
+.msg-box{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:2rem;text-align:center;color:var(--muted);font-size:.85rem}
+.msg-box.error{border-color:#ff3b4e44;color:var(--danger)}
+</style>
+</head>
+<body>
+
+<nav>
+  <a class="nav-brand" href="/"><span class="dot"></span>GAT-IDS</a>
+  <div class="nav-links">
+    <a class="nav-link" href="/">Accueil</a>
+    <a class="nav-link active" href="/upload">Analyse CSV</a>
+    <a class="nav-link" href="/realtime">Temps Réel</a>
+  </div>
+</nav>
+
+<div class="page">
+  <div class="page-header">
+    <div class="page-tag">// analyse hors-ligne</div>
+    <h1 class="page-title">Analyse de Dataset CSV</h1>
+  </div>
+
+  <!-- DROP ZONE -->
+  <div class="dropzone" id="dropzone">
+    <input type="file" id="file-input" accept=".csv">
+    <div class="drop-title">Déposez votre fichier CSV ici</div>
+    <div class="drop-sub">Format CIC-IDS · Max 200 MB · Jusqu'à 5000 flux analysés</div>
+    <button class="btn btn-outline" onclick="document.getElementById('file-input').click()">
+      Sélectionner un fichier
+    </button>
+  </div>
+
+  <!-- FILE INFO -->
+  <div class="file-info" id="file-info">
+    <div>
+      <div class="file-name" id="fname"></div>
+      <div class="file-meta" id="fmeta"></div>
+    </div>
+    <button class="btn btn-primary btn-analyze" id="btn-analyze" onclick="analyzeFile()">
+      Lancer l'analyse
+    </button>
+  </div>
+
+  <!-- PROGRESS -->
+  <div class="progress-box" id="progress-box">
+    <div class="progress-label">
+      <span id="progress-text">Préparation…</span>
+      <span id="progress-pct">0%</span>
+    </div>
+    <div class="progress-bar-wrap">
+      <div class="progress-bar" id="progress-bar"></div>
+    </div>
+    <div class="progress-log" id="progress-log"></div>
+  </div>
+
+  <!-- RESULTS -->
+  <div id="results">
+    <!-- Stats -->
+    <div class="stats-grid" id="stats-grid"></div>
+
+    <!-- Charts -->
+    <div class="charts-row">
+      <div class="chart-box">
+        <div class="chart-title">Distribution Normal / Attaque</div>
+        <div class="donut-wrap">
+          <div class="donut">
+            <svg viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="18" cy="18" r="14" fill="none" stroke="#0f2030" stroke-width="4"/>
+              <circle cx="18" cy="18" r="14" fill="none" stroke="#ff3b4e" stroke-width="4"
+                stroke-dasharray="0 88" stroke-linecap="round" id="donut-attack"/>
+              <circle cx="18" cy="18" r="14" fill="none" stroke="#00e676" stroke-width="4"
+                stroke-dasharray="0 88" stroke-linecap="round" id="donut-normal"
+                stroke-dashoffset="0"/>
+            </svg>
+            <div class="donut-center">
+              <span class="donut-pct" id="donut-pct">0%</span>
+              <span class="donut-sub">attaques</span>
+            </div>
+          </div>
+          <div class="donut-legend" id="donut-legend"></div>
+        </div>
+      </div>
+
+      <div class="chart-box">
+        <div class="chart-title">Types d'attaques détectées</div>
+        <div class="bar-list" id="attack-bars"></div>
+      </div>
+    </div>
+
+    <!-- Table -->
+    <div class="table-wrap">
+      <div class="table-header">
+        <div class="table-title">Aperçu des flux analysés (100 premiers)</div>
+        <input class="table-search" id="table-search" placeholder="Filtrer…" oninput="filterTable()">
+      </div>
+      <div class="table-scroll">
+        <table id="results-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Statut</th>
+              <th>Type d'attaque</th>
+              <th>Confiance binaire</th>
+              <th>Confiance multi</th>
+            </tr>
+          </thead>
+          <tbody id="table-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let selectedFile = null;
+let allRows = [];
+
+// ── Drag & Drop ──────────────────────────────────────────────────────────────
+const dz = document.getElementById('dropzone');
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('drag'));
+dz.addEventListener('drop', e => {
+  e.preventDefault(); dz.classList.remove('drag');
+  const f = e.dataTransfer.files[0];
+  if (f && f.name.endsWith('.csv')) selectFile(f);
+});
+
+document.getElementById('file-input').addEventListener('change', e => {
+  if (e.target.files[0]) selectFile(e.target.files[0]);
+});
+
+function selectFile(f) {
+  selectedFile = f;
+  document.getElementById('fname').textContent = f.name;
+  document.getElementById('fmeta').textContent =
+    `${(f.size / 1024 / 1024).toFixed(2)} MB · CSV`;
+  document.getElementById('file-info').classList.add('show');
+  document.getElementById('results').classList.remove('show');
+}
+
+// ── Analyse ──────────────────────────────────────────────────────────────────
+async function analyzeFile() {
+  if (!selectedFile) return;
+  const btn = document.getElementById('btn-analyze');
+  btn.disabled = true;
+
+  showProgress(true);
+  setProgress(10, 'Envoi du fichier au serveur…');
+
+  const fd = new FormData();
+  fd.append('file', selectedFile);
+
+  try {
+    setProgress(30, 'Preprocessing & normalisation…');
+    const res = await fetch('/api/upload', { method: 'POST', body: fd });
+    setProgress(70, 'Classification GAT en cours…');
+    const data = await res.json();
+
+    if (!res.ok || data.error) {
+      showError(data.error || 'Erreur serveur');
+      return;
+    }
+
+    setProgress(95, 'Rendu des résultats…');
+    await sleep(400);
+    setProgress(100, 'Analyse terminée.');
+    await sleep(300);
+    showProgress(false);
+    renderResults(data);
+  } catch (err) {
+    showError('Erreur réseau : ' + err.message);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function setProgress(pct, msg) {
+  document.getElementById('progress-bar').style.width = pct + '%';
+  document.getElementById('progress-pct').textContent = pct + '%';
+  document.getElementById('progress-text').textContent = msg;
+  const log = document.getElementById('progress-log');
+  log.textContent = '> ' + msg;
+}
+
+function showProgress(v) {
+  document.getElementById('progress-box').classList.toggle('show', v);
+}
+
+function showError(msg) {
+  showProgress(false);
+  document.getElementById('results').innerHTML =
+    `<div class="msg-box error">${msg}</div>`;
+  document.getElementById('results').classList.add('show');
+}
+
+// ── Rendu résultats ──────────────────────────────────────────────────────────
+function renderResults(data) {
+  const s = data.stats;
+  document.getElementById('results').classList.add('show');
+
+  // Stats cards
+  const dr = s.detection_rate;
+  document.getElementById('stats-grid').innerHTML = `
+    <div class="stat-card"><div class="stat-label">Flux analysés</div>
+      <div class="stat-val">${s.total.toLocaleString()}</div></div>
+    <div class="stat-card alert"><div class="stat-label">Attaques détectées</div>
+      <div class="stat-val danger">${s.attacks.toLocaleString()}</div></div>
+    <div class="stat-card safe"><div class="stat-label">Flux normaux</div>
+      <div class="stat-val safe">${s.normals.toLocaleString()}</div></div>
+    <div class="stat-card ${dr>50?'alert':'safe'}"><div class="stat-label">Taux d'attaque</div>
+      <div class="stat-val ${dr>50?'danger':'safe'}">${dr}%</div></div>
+    <div class="stat-card"><div class="stat-label">Confiance binaire</div>
+      <div class="stat-val">${s.avg_conf_binary}%</div></div>
+    <div class="stat-card"><div class="stat-label">Confiance multi</div>
+      <div class="stat-val">${s.avg_conf_multi}%</div></div>
+  `;
+
+  // Donut
+  const circ = 2 * Math.PI * 14;
+  const atkPct = s.detection_rate / 100;
+  const atkArc = atkPct * circ;
+  const normArc = (1 - atkPct) * circ;
+
+  document.getElementById('donut-attack').setAttribute('stroke-dasharray', `${atkArc} ${circ}`);
+  document.getElementById('donut-normal').setAttribute('stroke-dasharray', `${normArc} ${circ}`);
+  document.getElementById('donut-normal').setAttribute('stroke-dashoffset', -atkArc);
+  document.getElementById('donut-pct').textContent = s.detection_rate + '%';
+
+  document.getElementById('donut-legend').innerHTML = `
+    <div class="legend-item"><div class="legend-dot" style="background:#ff3b4e"></div>
+      Attaques — ${s.attacks}</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#00e676"></div>
+      Normaux — ${s.normals}</div>
+  `;
+
+  // Attack bars
+  const types = s.attack_types;
+  const maxVal = Math.max(...Object.values(types), 1);
+  let barsHTML = '';
+  Object.entries(types)
+    .sort((a,b) => b[1]-a[1])
+    .forEach(([name, cnt]) => {
+      const w = (cnt / maxVal * 100).toFixed(1);
+      const col = (data.attack_colors || {})[name] || '#00d4ff';
+      barsHTML += `
+        <div class="bar-item-row">
+          <div class="bar-label" title="${name}">${name}</div>
+          <div class="bar-track"><div class="bar-fill" style="width:${w}%;background:${col}"></div></div>
+          <div class="bar-count">${cnt}</div>
+        </div>`;
+    });
+  document.getElementById('attack-bars').innerHTML = barsHTML ||
+    '<div style="color:var(--muted);font-size:.8rem">Aucune attaque détectée</div>';
+
+  // Table
+  allRows = data.preview || [];
+  renderTable(allRows);
+}
+
+function renderTable(rows) {
+  const body = document.getElementById('table-body');
+  if (!rows.length) {
+    body.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:2rem">Aucune donnée</td></tr>';
+    return;
+  }
+  body.innerHTML = rows.map(r => `
+    <tr>
+      <td style="color:var(--muted)">${r.id}</td>
+      <td><span class="badge ${r.is_attack?'badge-attack':'badge-normal'}">
+        ${r.binary_label}</span></td>
+      <td><span class="badge badge-type" style="background:${r.color}22;color:${r.color}">
+        ${r.multi_label}</span></td>
+      <td>
+        <span style="color:${r.is_attack?'var(--danger)':'var(--safe)'}">${r.binary_conf.toFixed(1)}%</span>
+        <div class="conf-bar" style="width:${r.binary_conf}%;background:${r.is_attack?'var(--danger)':'var(--safe)'}"></div>
+      </td>
+      <td>
+        <span style="color:${r.color}">${r.multi_conf.toFixed(1)}%</span>
+        <div class="conf-bar" style="width:${r.multi_conf}%;background:${r.color}"></div>
+      </td>
+    </tr>`).join('');
+}
+
+function filterTable() {
+  const q = document.getElementById('table-search').value.toLowerCase();
+  const filtered = allRows.filter(r =>
+    r.binary_label.toLowerCase().includes(q) ||
+    r.multi_label.toLowerCase().includes(q) ||
+    String(r.id).includes(q)
+  );
+  renderTable(filtered);
+}
+
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+</script>
+</body>
+</html>

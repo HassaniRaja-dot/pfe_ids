@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Temps Réel · GAT-IDS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#020408;--surface:#080e14;--surface2:#0c1620;
+  --border:#0f2030;--border2:#1a3a50;
+  --accent:#00d4ff;--danger:#ff3b4e;--safe:#00e676;--warn:#ffb300;
+  --muted:#4a6b80;--text:#d0e8f0;--dim:#7a99aa;
+  --mono:'JetBrains Mono',monospace;--sans:'Syne',sans-serif;
+}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:var(--mono);min-height:100vh;overflow-x:hidden}
+body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(0,212,255,.025)1px,transparent 1px),linear-gradient(90deg,rgba(0,212,255,.025)1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0}
+
+nav{position:fixed;top:0;left:0;right:0;z-index:100;background:rgba(2,4,8,.92);border-bottom:1px solid var(--border2);backdrop-filter:blur(12px);display:flex;align-items:center;justify-content:space-between;padding:0 2rem;height:58px}
+.nav-brand{display:flex;align-items:center;gap:.75rem;font-family:var(--sans);font-weight:700;font-size:1.1rem;color:var(--accent);letter-spacing:.05em;text-decoration:none}
+.nav-brand .dot{width:8px;height:8px;border-radius:50%;background:var(--accent);box-shadow:0 0 8px var(--accent);animation:pulse-dot 2s infinite}
+@keyframes pulse-dot{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.8)}}
+.nav-links{display:flex;gap:.5rem}
+.nav-link{padding:.45rem 1rem;font-size:.8rem;font-family:var(--mono);letter-spacing:.08em;color:var(--dim);text-decoration:none;border:1px solid transparent;border-radius:4px;transition:all .2s;text-transform:uppercase}
+.nav-link:hover,.nav-link.active{color:var(--accent);border-color:var(--border2);background:rgba(0,212,255,.05)}
+
+/* ── PAGE ── */
+.page{position:relative;z-index:1;padding:5rem 2rem 4rem;max-width:1300px;margin:0 auto}
+.page-header{margin-bottom:2rem;display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:1rem}
+.page-tag{font-size:.7rem;letter-spacing:.2em;text-transform:uppercase;color:var(--danger);margin-bottom:.5rem}
+.page-title{font-family:var(--sans);font-size:2rem;font-weight:800}
+
+/* ── STATUS BAR ── */
+.status-bar{display:flex;align-items:center;gap:1rem;flex-wrap:wrap}
+.status-dot{width:10px;height:10px;border-radius:50%;background:var(--muted);flex-shrink:0;transition:background .3s}
+.status-dot.live{background:var(--danger);box-shadow:0 0 10px var(--danger);animation:blink 1s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+.status-label{font-size:.8rem;color:var(--dim);text-transform:uppercase;letter-spacing:.08em}
+
+/* ── CONTROLS ── */
+.controls{display:flex;gap:.75rem;flex-wrap:wrap;margin-bottom:2rem}
+.btn{display:inline-flex;align-items:center;gap:.6rem;padding:.65rem 1.75rem;font-family:var(--mono);font-size:.82rem;letter-spacing:.06em;text-transform:uppercase;border-radius:4px;transition:all .2s;cursor:pointer;border:none;text-decoration:none}
+.btn-danger{background:var(--danger);color:#fff;font-weight:700;box-shadow:0 0 16px rgba(255,59,78,.3)}
+.btn-danger:hover{background:#ff6070;transform:translateY(-2px)}
+.btn-stop{background:transparent;color:var(--muted);border:1px solid var(--border2)}
+.btn-stop:hover{border-color:var(--muted);color:var(--text)}
+.btn:disabled{opacity:.35;cursor:not-allowed;transform:none!important}
+
+/* ── MAIN GRID ── */
+.main-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1.25rem;margin-bottom:1.5rem}
+@media(max-width:900px){.main-grid{grid-template-columns:1fr 1fr}}
+@media(max-width:600px){.main-grid{grid-template-columns:1fr}}
+
+.metric-card{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:1.25rem 1.5rem;position:relative;overflow:hidden}
+.metric-card.live-card{border-color:var(--border2)}
+.metric-tag{font-size:.68rem;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin-bottom:.4rem}
+.metric-val{font-family:var(--sans);font-size:2.2rem;font-weight:800;color:var(--text);transition:color .3s}
+.metric-val.danger{color:var(--danger)}
+.metric-val.safe{color:var(--safe)}
+.metric-sub{font-size:.72rem;color:var(--muted);margin-top:.3rem}
+.metric-pulse{position:absolute;top:.75rem;right:.75rem;width:6px;height:6px;border-radius:50%;background:var(--border2)}
+.metric-pulse.live{background:var(--accent);box-shadow:0 0 6px var(--accent);animation:blink 1.5s infinite}
+
+/* ── BOTTOM GRID ── */
+.bottom-grid{display:grid;grid-template-columns:2fr 1fr;gap:1.25rem}
+@media(max-width:900px){.bottom-grid{grid-template-columns:1fr}}
+
+/* ── FLOW LOG ── */
+.flow-log{background:var(--surface);border:1px solid var(--border);border-radius:6px;overflow:hidden}
+.panel-header{padding:1rem 1.5rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.panel-title{font-size:.75rem;text-transform:uppercase;letter-spacing:.12em;color:var(--dim)}
+.panel-count{font-size:.72rem;color:var(--muted);font-family:var(--mono)}
+
+.log-scroll{height:340px;overflow-y:auto;padding:.5rem 0}
+.log-scroll::-webkit-scrollbar{width:4px}
+.log-scroll::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+
+.log-row{display:grid;grid-template-columns:70px 1fr 120px 80px;align-items:center;gap:.75rem;padding:.55rem 1.25rem;border-bottom:1px solid var(--border);font-size:.75rem;animation:slide-in .3s ease;transition:background .15s}
+.log-row:hover{background:rgba(0,212,255,.03)}
+@keyframes slide-in{from{opacity:0;transform:translateX(-8px)}to{opacity:1;transform:none}}
+.log-time{color:var(--muted);font-family:var(--mono)}
+.log-status{padding:.2rem .5rem;border-radius:3px;font-size:.68rem;font-weight:500;text-align:center;letter-spacing:.05em}
+.log-status.atk{background:rgba(255,59,78,.15);color:var(--danger)}
+.log-status.ok{background:rgba(0,230,118,.1);color:var(--safe)}
+.log-type{font-size:.72rem}
+.log-conf{color:var(--muted);text-align:right;font-size:.72rem}
+
+.log-empty{padding:3rem;text-align:center;color:var(--muted);font-size:.82rem}
+
+/* ── ATTACK DIST ── */
+.attack-dist{background:var(--surface);border:1px solid var(--border);border-radius:6px;overflow:hidden}
+.dist-body{padding:1.25rem}
+.dist-item{margin-bottom:.9rem}
+.dist-row{display:flex;justify-content:space-between;align-items:center;font-size:.75rem;margin-bottom:.3rem}
+.dist-name{color:var(--dim)}
+.dist-count{color:var(--muted)}
+.dist-track{height:5px;background:var(--border);border-radius:3px;overflow:hidden}
+.dist-fill{height:100%;border-radius:3px;transition:width .6s ease}
+.dist-empty{padding:2rem;text-align:center;color:var(--muted);font-size:.8rem}
+
+/* ── TERMINAL ── */
+.terminal{background:var(--surface);border:1px solid var(--border);border-radius:6px;margin-top:1.5rem;overflow:hidden}
+.term-header{padding:.75rem 1.25rem;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:.5rem}
+.term-dot{width:8px;height:8px;border-radius:50%}
+.term-body{padding:1.25rem;font-size:.78rem;color:var(--dim);font-family:var(--mono);line-height:1.8;max-height:200px;overflow-y:auto}
+.term-body .c-green{color:var(--safe)}
+.term-body .c-blue{color:var(--accent)}
+.term-body .c-red{color:var(--danger)}
+.term-body .c-yellow{color:var(--warn)}
+</style>
+</head>
+<body>
+
+<nav>
+  <a class="nav-brand" href="/"><span class="dot"></span>GAT-IDS</a>
+  <div class="nav-links">
+    <a class="nav-link" href="/">Accueil</a>
+    <a class="nav-link" href="/upload">Analyse CSV</a>
+    <a class="nav-link active" href="/realtime">Temps Réel</a>
+  </div>
+</nav>
+
+<div class="page">
+  <div class="page-header">
+    <div>
+      <div class="page-tag">// capture temps réel</div>
+      <h1 class="page-title">Surveillance Réseau Live</h1>
+    </div>
+    <div class="status-bar">
+      <div class="status-dot" id="status-dot"></div>
+      <span class="status-label" id="status-label">En attente</span>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button class="btn btn-danger" id="btn-start" onclick="startCapture()">
+      Démarrer la capture
+    </button>
+    <button class="btn btn-stop" id="btn-stop" onclick="stopCapture()" disabled>
+      Arrêter
+    </button>
+  </div>
+
+  <!-- Métriques -->
+  <div class="main-grid">
+    <div class="metric-card">
+      <div class="metric-tag">Flux analysés</div>
+      <div class="metric-val" id="m-total">0</div>
+      <div class="metric-sub">depuis le démarrage</div>
+      <div class="metric-pulse" id="pulse-total"></div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-tag">Attaques détectées</div>
+      <div class="metric-val danger" id="m-attacks">0</div>
+      <div class="metric-sub">flux malveillants</div>
+      <div class="metric-pulse" id="pulse-attacks"></div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-tag">Taux d'attaque</div>
+      <div class="metric-val" id="m-rate">0%</div>
+      <div class="metric-sub">sur total analysé</div>
+      <div class="metric-pulse" id="pulse-rate"></div>
+    </div>
+  </div>
+
+  <!-- Log + Distribution -->
+  <div class="bottom-grid">
+    <div class="flow-log">
+      <div class="panel-header">
+        <div class="panel-title">Journal des flux (20 derniers)</div>
+        <div class="panel-count" id="log-count">0 flux</div>
+      </div>
+      <div class="log-scroll" id="log-scroll">
+        <div class="log-empty" id="log-empty">
+          En attente de démarrage de la capture…
+        </div>
+      </div>
+    </div>
+
+    <div class="attack-dist">
+      <div class="panel-header">
+        <div class="panel-title">Distribution des attaques</div>
+      </div>
+      <div class="dist-body" id="dist-body">
+        <div class="dist-empty">Aucune attaque détectée</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Terminal d'info -->
+  <div class="terminal">
+    <div class="term-header">
+      <div class="term-dot" style="background:#ff3b4e"></div>
+      <div class="term-dot" style="background:#ffb300"></div>
+      <div class="term-dot" style="background:#00e676"></div>
+      <span style="font-size:.72rem;color:var(--muted);margin-left:.5rem">configuration · script de capture</span>
+    </div>
+    <div class="term-body" id="term-body">
+<span class="c-blue"># ── Script de capture — à exécuter sur Kali ou Ubuntu (VirtualBox) ──</span>
+
+<span class="c-yellow">pip install scapy pandas requests scikit-learn</span>
+
+<span class="c-blue"># Sauvegardez le script capture_agent.py fourni avec ce projet</span>
+<span class="c-blue"># puis exécutez :</span>
+
+<span class="c-green">python3 capture_agent.py --interface eth0 --server http://&lt;IP_HOTE&gt;:5000 --interval 2</span>
+
+<span class="c-blue"># Options :</span>
+  <span class="c-green">--interface</span> <span style="color:var(--dim)">eth0 | ens33 | wlan0   (interface réseau de la VM)</span>
+  <span class="c-green">--server</span>    <span style="color:var(--dim)">URL du serveur Flask (IP hôte depuis la VM)</span>
+  <span class="c-green">--interval</span>  <span style="color:var(--dim)">secondes entre chaque envoi (défaut: 2)</span>
+  <span class="c-green">--batch</span>     <span style="color:var(--dim)">nombre de flux par batch (défaut: 50)</span>
+
+<span class="c-blue"># Dans VirtualBox : réseau en mode "Réseau NAT" ou "Réseau hôte uniquement"</span>
+<span class="c-blue"># L'IP hôte est généralement 10.0.2.2 (NAT) ou 192.168.56.1 (host-only)</span>
+    </div>
+  </div>
+</div>
+
+<script>
+let sse = null;
+let running = false;
+
+const ATTACK_COLORS = {
+  Normal:'#22c55e',Attaque:'#ef4444',DDoS:'#ef4444',DoS:'#f97316',
+  Botnet:'#a855f7',Infiltration:'#ec4899',BruteForce:'#f59e0b',
+  WebAttack:'#3b82f6',PortScan:'#06b6d4'
+};
+
+// ── Démarrer ──────────────────────────────────────────────────────────────────
+async function startCapture() {
+  const res = await fetch('/api/realtime/start', {method:'POST'});
+  const d = await res.json();
+  if (!d.success) { alert('Erreur: ' + d.error); return; }
+
+  running = true;
+  document.getElementById('btn-start').disabled = true;
+  document.getElementById('btn-stop').disabled = false;
+  document.getElementById('status-dot').classList.add('live');
+  document.getElementById('status-label').textContent = 'Capture active';
+
+  // Activer pulsations
+  ['total','attacks','rate'].forEach(k =>
+    document.getElementById('pulse-'+k).classList.add('live'));
+
+  // Vider log
+  document.getElementById('log-scroll').innerHTML =
+    '<div class="log-empty">En attente de données…</div>';
+  document.getElementById('log-count').textContent = '0 flux';
+
+  // Ouvrir SSE
+  if (sse) sse.close();
+  sse = new EventSource('/api/realtime/stream');
+  sse.onmessage = e => {
+    try { handleSSE(JSON.parse(e.data)); } catch {}
+  };
+  sse.onerror = () => {
+    if (running) setTimeout(() => {
+      sse = new EventSource('/api/realtime/stream');
+      sse.onmessage = e => { try { handleSSE(JSON.parse(e.data)); } catch {} };
+    }, 1000);
+  };
+}
+
+// ── Arrêter ───────────────────────────────────────────────────────────────────
+async function stopCapture() {
+  await fetch('/api/realtime/stop', {method:'POST'});
+  running = false;
+  if (sse) { sse.close(); sse = null; }
+
+  document.getElementById('btn-start').disabled = false;
+  document.getElementById('btn-stop').disabled = true;
+  document.getElementById('status-dot').classList.remove('live');
+  document.getElementById('status-label').textContent = 'Arrêté';
+
+  ['total','attacks','rate'].forEach(k =>
+    document.getElementById('pulse-'+k).classList.remove('live'));
+}
+
+// ── Handler SSE ───────────────────────────────────────────────────────────────
+function handleSSE(d) {
+  if (d.type === 'connected') return;
+  if (d.type !== 'stats') return;
+
+  // Métriques
+  document.getElementById('m-total').textContent = d.total.toLocaleString();
+  document.getElementById('m-attacks').textContent = d.attacks.toLocaleString();
+  const rate = d.detection_rate || 0;
+  const rateEl = document.getElementById('m-rate');
+  rateEl.textContent = rate + '%';
+  rateEl.className = 'metric-val ' + (rate > 50 ? 'danger' : rate > 20 ? '' : 'safe');
+
+  // Log des flux
+  if (d.last_flows && d.last_flows.length > 0) {
+    renderLog(d.last_flows, d.total);
+  }
+
+  // Distribution
+  renderDist(d.attack_types || {});
+}
+
+let logRows = [];
+
+function renderLog(flows, total) {
+  document.getElementById('log-count').textContent = total + ' flux';
+  const scroll = document.getElementById('log-scroll');
+
+  // Ajouter nouveaux flux en tête
+  flows.forEach(f => {
+    const existing = scroll.querySelector(`[data-id="${f.id}"]`);
+    if (!existing) {
+      const row = document.createElement('div');
+      row.className = 'log-row';
+      row.dataset.id = f.id;
+      const col = (ATTACK_COLORS[f.multi_label] || '#94a3b8');
+      row.innerHTML = `
+        <div class="log-time">${f.timestamp || '--:--:--'}</div>
+        <div class="log-status ${f.is_attack?'atk':'ok'}">${f.binary_label}</div>
+        <div class="log-type" style="color:${col}">${f.multi_label}</div>
+        <div class="log-conf">${f.binary_conf ? f.binary_conf.toFixed(0)+'%' : '--'}</div>
+      `;
+      // Insérer en tête (après l'empty si présent)
+      const empty = scroll.querySelector('.log-empty');
+      if (empty) empty.remove();
+      scroll.insertBefore(row, scroll.firstChild);
+    }
+  });
+
+  // Limiter à 20 lignes
+  const rows = scroll.querySelectorAll('.log-row');
+  if (rows.length > 20) {
+    for (let i = 20; i < rows.length; i++) rows[i].remove();
+  }
+}
+
+function renderDist(types) {
+  const body = document.getElementById('dist-body');
+  const entries = Object.entries(types).sort((a,b) => b[1]-a[1]);
+  if (!entries.length) {
+    body.innerHTML = '<div class="dist-empty">Aucune attaque détectée</div>';
+    return;
+  }
+  const maxVal = Math.max(...entries.map(e=>e[1]), 1);
+  body.innerHTML = entries.map(([name, cnt]) => {
+    const w = (cnt/maxVal*100).toFixed(1);
+    const col = ATTACK_COLORS[name] || '#94a3b8';
+    return `<div class="dist-item">
+      <div class="dist-row">
+        <span class="dist-name" style="color:${col}">${name}</span>
+        <span class="dist-count">${cnt}</span>
+      </div>
+      <div class="dist-track">
+        <div class="dist-fill" style="width:${w}%;background:${col}"></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+</script>
+</body>
+</html>

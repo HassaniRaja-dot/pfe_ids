@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GAT-IDS · Système de Détection d'Intrusion</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:       #020408;
+  --surface:  #080e14;
+  --border:   #0f2030;
+  --border2:  #1a3a50;
+  --accent:   #00d4ff;
+  --accent2:  #0099cc;
+  --danger:   #ff3b4e;
+  --safe:     #00e676;
+  --warn:     #ffb300;
+  --muted:    #4a6b80;
+  --text:     #d0e8f0;
+  --dim:      #7a99aa;
+  --mono:     'JetBrains Mono', monospace;
+  --sans:     'Syne', sans-serif;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--mono);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ── GRID BACKGROUND ── */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(0,212,255,.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,212,255,.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ── SCANLINE ── */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0,0,0,.08) 2px,
+    rgba(0,0,0,.08) 4px
+  );
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ── NAV ── */
+nav {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 100;
+  background: rgba(2,4,8,.92);
+  border-bottom: 1px solid var(--border2);
+  backdrop-filter: blur(12px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 2rem;
+  height: 58px;
+}
+
+.nav-brand {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  font-family: var(--sans);
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: var(--accent);
+  letter-spacing: .05em;
+  text-decoration: none;
+}
+
+.nav-brand .dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent);
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%,100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: .5; transform: scale(.8); }
+}
+
+.nav-links { display: flex; gap: .5rem; }
+
+.nav-link {
+  padding: .45rem 1rem;
+  font-size: .8rem;
+  font-family: var(--mono);
+  letter-spacing: .08em;
+  color: var(--dim);
+  text-decoration: none;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  transition: all .2s;
+  text-transform: uppercase;
+}
+
+.nav-link:hover, .nav-link.active {
+  color: var(--accent);
+  border-color: var(--border2);
+  background: rgba(0,212,255,.05);
+}
+
+/* ── HERO ── */
+.hero {
+  position: relative;
+  z-index: 1;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 6rem 2rem 4rem;
+}
+
+.hero-badge {
+  display: inline-block;
+  font-size: .7rem;
+  letter-spacing: .15em;
+  text-transform: uppercase;
+  color: var(--accent);
+  border: 1px solid var(--border2);
+  background: rgba(0,212,255,.06);
+  padding: .35rem 1rem;
+  border-radius: 2px;
+  margin-bottom: 2.5rem;
+  font-family: var(--mono);
+}
+
+.hero h1 {
+  font-family: var(--sans);
+  font-size: clamp(2.5rem, 6vw, 5rem);
+  font-weight: 800;
+  line-height: 1.05;
+  margin-bottom: 1.5rem;
+  letter-spacing: -.02em;
+}
+
+.hero h1 span.glow {
+  color: var(--accent);
+  text-shadow: 0 0 40px rgba(0,212,255,.4);
+}
+
+.hero-sub {
+  font-size: .95rem;
+  color: var(--dim);
+  max-width: 560px;
+  line-height: 1.8;
+  margin-bottom: 3.5rem;
+  font-family: var(--mono);
+}
+
+.hero-actions {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: .6rem;
+  padding: .75rem 2rem;
+  font-family: var(--mono);
+  font-size: .85rem;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  text-decoration: none;
+  border-radius: 4px;
+  transition: all .2s;
+  cursor: pointer;
+  border: none;
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: #000;
+  font-weight: 700;
+  box-shadow: 0 0 20px rgba(0,212,255,.3);
+}
+
+.btn-primary:hover {
+  background: #fff;
+  box-shadow: 0 0 30px rgba(0,212,255,.5);
+  transform: translateY(-2px);
+}
+
+.btn-outline {
+  background: transparent;
+  color: var(--accent);
+  border: 1px solid var(--border2);
+}
+
+.btn-outline:hover {
+  background: rgba(0,212,255,.08);
+  border-color: var(--accent);
+  transform: translateY(-2px);
+}
+
+/* ── STATS ROW ── */
+.hero-stats {
+  display: flex;
+  gap: 3rem;
+  margin-top: 5rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.stat-item {
+  text-align: center;
+}
+
+.stat-num {
+  font-family: var(--sans);
+  font-size: 2rem;
+  font-weight: 800;
+  color: var(--accent);
+  display: block;
+}
+
+.stat-label {
+  font-size: .72rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  margin-top: .25rem;
+}
+
+/* ── FEATURES SECTION ── */
+.section {
+  position: relative;
+  z-index: 1;
+  padding: 6rem 2rem;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.section-title {
+  font-family: var(--sans);
+  font-size: .75rem;
+  letter-spacing: .2em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 1rem;
+}
+
+.section-heading {
+  font-family: var(--sans);
+  font-size: clamp(1.6rem, 3vw, 2.4rem);
+  font-weight: 700;
+  margin-bottom: 3rem;
+  color: var(--text);
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1.5rem;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 2rem;
+  transition: border-color .2s, transform .2s;
+  position: relative;
+  overflow: hidden;
+}
+
+.card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  opacity: 0;
+  transition: opacity .3s;
+}
+
+.card:hover { border-color: var(--border2); transform: translateY(-4px); }
+.card:hover::before { opacity: 1; }
+
+.card-num {
+  font-size: .7rem;
+  color: var(--accent);
+  letter-spacing: .15em;
+  margin-bottom: 1.25rem;
+  font-family: var(--mono);
+}
+
+.card h3 {
+  font-family: var(--sans);
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin-bottom: .75rem;
+  color: var(--text);
+}
+
+.card p {
+  font-size: .82rem;
+  color: var(--dim);
+  line-height: 1.7;
+}
+
+/* ── MODE CARDS ── */
+.mode-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+  margin-top: 2rem;
+}
+
+@media (max-width: 700px) {
+  .mode-grid { grid-template-columns: 1fr; }
+}
+
+.mode-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 2.5rem;
+  text-decoration: none;
+  color: inherit;
+  display: block;
+  transition: all .25s;
+  position: relative;
+  overflow: hidden;
+}
+
+.mode-card::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 3px;
+  transition: transform .3s;
+  transform: scaleX(0);
+  transform-origin: left;
+}
+
+.mode-card.upload-card::after  { background: var(--accent); }
+.mode-card.realtime-card::after { background: var(--danger); }
+
+.mode-card:hover { transform: translateY(-6px); border-color: var(--border2); }
+.mode-card:hover::after { transform: scaleX(1); }
+
+.mode-tag {
+  font-size: .68rem;
+  letter-spacing: .15em;
+  text-transform: uppercase;
+  padding: .3rem .75rem;
+  border-radius: 2px;
+  display: inline-block;
+  margin-bottom: 1.5rem;
+}
+
+.tag-csv     { background: rgba(0,212,255,.1); color: var(--accent); }
+.tag-live    { background: rgba(255,59,78,.1);  color: var(--danger); }
+
+.mode-card h2 {
+  font-family: var(--sans);
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: .75rem;
+}
+
+.mode-card p {
+  font-size: .83rem;
+  color: var(--dim);
+  line-height: 1.75;
+}
+
+.mode-arrow {
+  display: inline-flex;
+  align-items: center;
+  gap: .5rem;
+  font-size: .8rem;
+  margin-top: 1.5rem;
+  color: var(--dim);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  transition: color .2s, gap .2s;
+}
+
+.mode-card:hover .mode-arrow { color: var(--accent); gap: .8rem; }
+
+/* ── ARCHITECTURE BOX ── */
+.arch-box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 2rem;
+  font-size: .8rem;
+  line-height: 1.9;
+  font-family: var(--mono);
+  color: var(--dim);
+}
+
+.arch-box .hl { color: var(--accent); }
+.arch-box .hl2 { color: var(--safe); }
+.arch-box .hl3 { color: var(--warn); }
+
+/* ── FOOTER ── */
+footer {
+  position: relative;
+  z-index: 1;
+  border-top: 1px solid var(--border);
+  padding: 2rem;
+  text-align: center;
+  font-size: .75rem;
+  color: var(--muted);
+  font-family: var(--mono);
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <a class="nav-brand" href="/">
+    <span class="dot"></span>
+    GAT-IDS
+  </a>
+  <div class="nav-links">
+    <a class="nav-link active" href="/">Accueil</a>
+    <a class="nav-link" href="/upload">Analyse CSV</a>
+    <a class="nav-link" href="/realtime">Temps Réel</a>
+  </div>
+</nav>
+
+<section class="hero">
+  <div class="hero-badge">Université Moulay Ismail      Projet de Fin d'Études</div>
+
+  <h1>
+    Détection d'Intrusion<br>
+    <span class="glow">Basée sur GAT</span>
+  </h1>
+
+  <div class="hero-actions">
+    <a class="btn btn-primary" href="/upload">Analyser un dataset CSV</a>
+    <a class="btn btn-outline" href="/realtime">Capture temps réel</a>
+  </div>
+
+  <div class="hero-stats">
+    <div class="stat-item">
+      <span class="stat-num">91.5%</span>
+      <span class="stat-label">Accuracy binaire</span>
+    </div>
+    <div class="stat-item">
+      <span class="stat-num">85.2%</span>
+      <span class="stat-label">Accuracy multi-classe</span>
+    </div>
+    <div class="stat-item">
+      <span class="stat-num">8</span>
+      <span class="stat-label">Types d'attaques</span>
+    </div>
+    <div class="stat-item">
+      <span class="stat-num">53</span>
+      <span class="stat-label">Features réseau</span>
+    </div>
+  </div>
+</section>
+
+<!-- Modes d'utilisation -->
+<section class="section">
+  <div class="section-title">// modes d'analyse</div>
+  <div class="section-heading">Choisissez votre mode</div>
+
+  <div class="mode-grid">
+    <a class="mode-card upload-card" href="/upload">
+      <span class="mode-tag tag-csv">Dataset CSV</span>
+      <h2>Analyse hors-ligne</h2>
+      <p>
+        Uploadez un fichier CSV de flux réseau (format CIC-IDS).
+        Le système préprocesse, construit le graphe KNN et classe
+        chaque flux avec le modèle GAT binaire et multi-classe.
+      </p>
+      <div class="mode-arrow">Démarrer l'analyse →</div>
+    </a>
+
+    <a class="mode-card realtime-card" href="/realtime">
+      <span class="mode-tag tag-live">Live</span>
+      <h2>Capture temps réel</h2>
+      <p>
+        Analysez le trafic réseau en direct depuis vos VMs Kali/Ubuntu
+        dans VirtualBox. Le script de capture envoie les flux toutes les
+        2 secondes au serveur pour classification instantanée.
+      </p>
+      <div class="mode-arrow">Démarrer la capture →</div>
+    </a>
+  </div>
+</section>
+
+<!-- Architecture -->
+<section class="section">
+  <div class="section-title">// architecture du modèle</div>
+  <div class="section-heading">Graph Attention Network</div>
+
+  <div class="arch-box">
+    <span class="hl">Entrée</span> : Flux réseau → Nœuds du graphe (53 features)<br>
+    <span class="hl">Graphe KNN</span> : k=5 voisins les plus proches (similarité cosinus)<br><br>
+
+    <span class="hl2">GATConv Layer 1</span> : 53 → 128 dims × 8 têtes = 1024 dims<br>
+    &nbsp;&nbsp;&nbsp;BatchNorm1d → ELU → Dropout(0.5)<br><br>
+
+    <span class="hl2">GATConv Layer 2</span> : 1024 → 64 dims × 4 têtes = 256 dims<br>
+    &nbsp;&nbsp;&nbsp;BatchNorm1d → ELU<br><br>
+
+    <span class="hl3">Classifieur binaire</span>&nbsp;&nbsp;: Linear(256 → 2) — Normal / Attaque<br>
+    <span class="hl3">Classifieur multi</span>&nbsp;&nbsp;&nbsp;: Linear(256 → 8) — 8 types d'attaques<br><br>
+
+    Dataset : <span class="hl">CIC-IDS 2017 + CIC-IDS 2018</span> (combiné pour couvrir toutes les classes)
+  </div>
+</section>
+
+<!-- Features -->
+<section class="section">
+  <div class="section-title">// fonctionnalités</div>
+  <div class="section-heading">Ce que le système détecte</div>
+
+  <div class="cards">
+    <div class="card">
+      <div class="card-num">01 / DDoS & DoS</div>
+      <h3>Déni de Service</h3>
+      <p>Détecte les attaques de saturation réseau, qu'elles soient distribuées (DDoS) ou mono-source (DoS).</p>
+    </div>
+    <div class="card">
+      <div class="card-num">02 / BruteForce</div>
+      <h3>Attaques par Force Brute</h3>
+      <p>SSH, HTTP, FTP — tentatives répétées de connexion détectées par l'analyse des patterns de flux.</p>
+    </div>
+    <div class="card">
+      <div class="card-num">03 / Botnet</div>
+      <h3>Machines Zombies</h3>
+      <p>Identification des machines compromises et contrôlées à distance par analyse comportementale.</p>
+    </div>
+    <div class="card">
+      <div class="card-num">04 / WebAttack</div>
+      <h3>Attaques Web</h3>
+      <p>Injection SQL, XSS, et autres vecteurs d'attaque ciblant les applications web.</p>
+    </div>
+    <div class="card">
+      <div class="card-num">05 / PortScan</div>
+      <h3>Reconnaissance</h3>
+      <p>Détecte les scans de ports utilisés pour cartographier les services exposés sur le réseau.</p>
+    </div>
+    <div class="card">
+      <div class="card-num">06 / Infiltration</div>
+      <h3>Accès Non Autorisé</h3>
+      <p>Identification des tentatives d'accès illicite au réseau interne via des techniques furtives.</p>
+    </div>
+  </div>
+</section>
+
+<footer>
+  Université Moulay Ismail &nbsp;|&nbsp Projet de Fin d'Études 
+</footer>
+
+</body>
+</html>
